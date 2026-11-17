@@ -4,6 +4,7 @@ const FILES = [
   './',
   'index.html',
   'version.js',
+  'garden.js',
   'manifest.json',
   'icons/icon.svg',
   'icons/favicon-32.png',

@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ear trainer</title>
+<script src="version.js"></script>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ear trainer">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<style>
+/* Retro console theme: black screen, white phosphor text, grays */
+:root{
+  color-scheme:dark;
+  --bg:#000000; --text:#e6e6e6; --muted:#8c8c8c; --dim:#555555; --line:#3a3a3a;
+  --inv-bg:#e6e6e6; --inv-text:#000000;
+  --key-white:#151515; --key-black:#6a6a6a; --key-hl:#e6e6e6; --key-label:#666666;
+  --mono:"SF Mono", ui-monospace, Menlo, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  --glow:0 0 6px rgba(230,230,230,.28);
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 var(--mono);text-shadow:var(--glow);
+  -webkit-text-size-adjust:100%}
+/* faint CRT scanlines */
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+  background:repeating-linear-gradient(to bottom,rgba(255,255,255,.035) 0 1px,transparent 1px 3px)}
+.wrap{max-width:760px;margin:0 auto;
+  padding:max(24px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(60px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left))}
+button,select,input{font:inherit;color:inherit;text-shadow:inherit}
+button{cursor:pointer;border-radius:0}
+button,.key,select,label{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px dashed var(--text);outline-offset:3px}
+
+/* header */
+.brand{display:flex;align-items:center;gap:14px;margin:0 0 18px;padding-bottom:14px;border-bottom:1px dashed var(--line)}
+.brand img{width:44px;height:44px;filter:invert(1);image-rendering:auto}
+.brand h1{margin:0;font-size:1.35rem;font-weight:700;letter-spacing:.06em;line-height:1.2}
+.brand h1::after{content:"_";animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.version{font-size:.78rem;color:var(--muted)}
+.update{margin-left:auto;background:var(--inv-bg);color:var(--inv-text);text-shadow:none;border:none;padding:6px 10px;font-size:.85rem}
+
+/* tabs */
+.tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:18px}
+.tab{background:none;border:1px solid transparent;padding:4px 10px;color:var(--muted)}
+.tab:hover{border-color:var(--line);color:var(--text)}
+.tab[aria-selected="true"]{background:var(--inv-bg);color:var(--inv-text);text-shadow:none}
+
+.desc{margin:0 0 16px;color:var(--muted)}
+.desc::before{content:"// "}
+
+/* controls */
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.primary{background:var(--inv-bg);color:var(--inv-text);text-shadow:none;border:2px solid var(--inv-bg);padding:8px 18px;font-weight:700}
+.primary:active{background:var(--muted);border-color:var(--muted)}
+.secondary{background:none;border:2px solid var(--text);padding:8px 14px}
+.secondary:hover{background:var(--inv-bg);color:var(--inv-text);text-shadow:none}
+.kbd-hint{font-size:.78rem;color:var(--dim)}
+
+/* output line */
+.feedback{min-height:3.4em;padding:10px 12px;margin-bottom:14px;border:1px solid var(--line)}
+.feedback::before{content:"> ";color:var(--muted)}
+.feedback.good{border:1px solid var(--text)}
+.feedback.good::before{content:"\2713  ";color:var(--text)}
+.feedback.bad{border:1px dashed var(--muted)}
+.feedback.bad::before{content:"\2717  ";color:var(--text)}
+.feedback .hint{display:block;color:var(--muted);font-size:.88rem;padding-left:2ch}
+
+/* answers */
+.answers{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-bottom:8px}
+.answers.compact{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+.answer{background:none;border:1px solid var(--line);padding:9px 10px;text-align:left}
+.answer:not(:disabled):hover{border-color:var(--text)}
+.answer:disabled{color:var(--dim);border-color:#222;cursor:default}
+.answer.correct{background:var(--inv-bg);color:var(--inv-text);border-color:var(--inv-bg);text-shadow:none;font-weight:700}
+.answer.correct::after{content:" \2713"}
+.answer.wrong{border-style:dashed;border-color:var(--muted);color:var(--muted);text-decoration:line-through}
+.answer .num{color:var(--dim);margin-right:6px;text-decoration:none;display:inline-block}
+.answer.correct .num{color:#555}
+.compare-note{font-size:.82rem;color:var(--muted);margin:0 0 18px;min-height:1.3em}
+
+/* keyboard */
+.kb{position:relative;height:120px;margin:6px 0 22px;user-select:none;-webkit-user-select:none;border-top:2px solid var(--line)}
+.key{position:absolute;top:0;cursor:pointer}
+.key.white{height:100%;background:var(--key-white);border:1px solid var(--line);border-top:none;z-index:1}
+.key.black{height:62%;background:var(--key-black);border:1px solid #000;border-top:none;z-index:2}
+.key.hl{background:var(--key-hl);box-shadow:0 0 10px rgba(230,230,230,.45)}
+.key span{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:.6rem;color:var(--key-label);text-shadow:none}
+.key.hl span{color:#000}
+
+/* settings */
+details{border:1px dashed var(--line);padding:10px 12px;margin-bottom:18px}
+summary{cursor:pointer;font-weight:700;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"[+] "}
+details[open] summary::before{content:"[-] "}
+.items{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:4px 12px;margin:12px 0}
+.items label,.opt label{display:flex;gap:8px;align-items:center;cursor:pointer}
+input[type=checkbox]{-webkit-appearance:none;appearance:none;margin:0;border:none;background:none;cursor:pointer;width:3ch;flex:none}
+input[type=checkbox]::before{content:"[ ]";color:var(--muted)}
+input[type=checkbox]:checked::before{content:"[x]";color:var(--text)}
+select{max-width:100%;-webkit-appearance:none;appearance:none;background:var(--bg);border:1px solid var(--line);border-radius:0;padding:4px 26px 4px 8px;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(-45deg,transparent 50%,var(--muted) 50%);
+  background-position:calc(100% - 13px) 55%,calc(100% - 8px) 55%;background-size:5px 5px;background-repeat:no-repeat}
+.opt{margin:8px 0 4px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.opt label{flex-wrap:wrap;max-width:100%}
+.warn{color:var(--text);font-size:.85rem;min-height:1.2em;margin:4px 0 0}
+.warn:not(:empty)::before{content:"! "}
+
+/* stats */
+.stats{border-top:1px dashed var(--line);padding-top:14px}
+.stats p{margin:0 0 6px}
+.linkbtn{background:none;border:none;padding:0;color:var(--muted);text-decoration:underline}
+.linkbtn:hover{color:var(--text)}
+
+@media (prefers-reduced-motion: reduce){
+  *{transition:none!important}
+  .brand h1::after{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <img src="icons/icon-180.png" alt="">
+    <div>
+      <h1>Ear trainer</h1>
+      <span class="version" id="version"></span>
+    </div>
+    <button class="update" id="updateBtn" hidden>New version ready. Reload</button>
+  </div>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+
+  <p class="desc" id="desc"></p>
+
+  <div class="controls">
+    <button class="primary" id="mainBtn">Start</button>
+    <button class="secondary" id="replayBtn" hidden>Replay</button>
+    <span class="kbd-hint">Space: play / next. Number keys: answer.</span>
+  </div>
+
+  <div class="feedback" id="feedback" aria-live="polite">Press Start to hear your first question.</div>
+
+  <div class="answers" id="answers"></div>
+  <p class="compare-note" id="compareNote"></p>
+
+  <div class="kb" id="kb" aria-label="Piano keyboard. Click a key to hear it."></div>
+
+  <details id="settings">
+    <summary>Choose what to practice</summary>
+    <div class="items" id="items"></div>
+    <div class="opt" id="opts"></div>
+    <p class="warn" id="warn"></p>
+  </details>
+
+  <section class="stats" id="stats"></section>
+</div>
+
+<script>
+/* ---------- Music data ---------- */
+const NOTE_NAMES = ['C','C♯/D♭','D','D♯/E♭','E','F','F♯/G♭','G','G♯/A♭','A','A♯/B♭','B'];
+const rand = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+function noteLabel(m) {
+  const oct = Math.floor(m / 12) - 1;
+  const n = NOTE_NAMES[m % 12];
+  if (!n.includes('/')) return n + oct;
+  const [a, b] = n.split('/');
+  return `${a}${oct} / ${b}${oct}`;
+}
+
+const EXERCISES = {
+  pitch: {
+    title: 'Notes',
+    desc: 'You hear middle C (C4) as a reference, then a mystery note. Name the mystery note.',
+    // These checkboxes are note names; each ticked name is used in every octave of the range.
+    items: NOTE_NAMES.map((n, i) => ({ id: 'n' + i, label: n, data: i, on: !n.includes('/') })),
+    options: { ref: true, range: '1' },
+    ranges: {
+      '1': [60, 72],   // C4 to C5
+      '2': [60, 84],   // C4 to C6
+      '3': [48, 84]    // C3 to C6
+    },
+    cache: new Map(),
+    activeItems() {
+      const [lo, hi] = this.ranges[this.options.range];
+      const out = [];
+      for (let m = lo; m <= hi; m++) {
+        if (!this.items[m % 12].on) continue;
+        if (!this.cache.has(m)) this.cache.set(m, { id: 'm' + m, label: noteLabel(m), data: m });
+        out.push(this.cache.get(m));
+      }
+      return out;
+    },
+    renderOptions(o) {
+      return `<label>Range
+        <select data-opt="range">
+          <option value="1" ${o.range === '1' ? 'selected' : ''}>Basic: octave 4 + C5</option>
+          <option value="2" ${o.range === '2' ? 'selected' : ''}>2 octaves: 4 and 5 + C6</option>
+          <option value="3" ${o.range === '3' ? 'selected' : ''}>3 octaves: 3, 4 and 5 + C6</option>
+        </select></label>
+        <label><input type="checkbox" data-opt="ref" ${o.ref ? 'checked' : ''}> Play C4 first as a reference</label>`;
+    },
+    root: () => 60,
+    build(item, root, o) {
+      const target = item.data;
+      return o.ref
+        ? [{ n: [root], t: 0, d: 0.9 }, { n: [target], t: 1.1, d: 1.4 }]
+        : [{ n: [target], t: 0, d: 1.4 }];
+    },
+    hint(item) {
+      const d = item.data - 60;
+      if (d === 0) return 'Same note as the reference C4.';
+      const way = d > 0 ? 'above' : 'below';
+      const a = Math.abs(d);
+      if (a % 12 === 0) return `${a === 12 ? 'One octave' : a / 12 + ' octaves'} ${way} the reference C4.`;
+      return `${a} semitone${a > 1 ? 's' : ''} ${way} the reference C4.`;
+    }
+  },
+
+  intervals: {
+    title: 'Intervals',
+    desc: 'Two notes are played. Name the distance between them.',
+    items: [
+      ['Minor 2nd', 1, 'Jaws theme'],
+      ['Major 2nd', 2, 'Happy Birthday (first two notes)'],
+      ['Minor 3rd', 3, 'Greensleeves (first two notes)'],
+      ['Major 3rd', 4, 'When the Saints Go Marching In'],
+      ['Perfect 4th', 5, 'Here Comes the Bride'],
+      ['Tritone', 6, 'The Simpsons theme'],
+      ['Perfect 5th', 7, 'Twinkle Twinkle Little Star (1st to 2nd note)'],
+      ['Minor 6th', 8, 'The Entertainer (the opening leap)'],
+      ['Major 6th', 9, 'My Bonnie Lies Over the Ocean'],
+      ['Minor 7th', 10, 'Original Star Trek theme'],
+      ['Major 7th', 11, 'Take On Me (chorus leap)'],
+      ['Octave', 12, 'Somewhere Over the Rainbow (first two notes)']
+    ].map(([label, s, ex]) => ({ id: 'i' + s, label, data: s, ex, on: [2, 4, 5, 7, 12].includes(s) })),
+    options: { dir: 'up' },
+    renderOptions(o) {
+      return `<label>Play the notes
+        <select data-opt="dir">
+          <option value="up" ${o.dir === 'up' ? 'selected' : ''}>going up</option>
+          <option value="down" ${o.dir === 'down' ? 'selected' : ''}>going down</option>
+          <option value="together" ${o.dir === 'together' ? 'selected' : ''}>at the same time</option>
+          <option value="mixed" ${o.dir === 'mixed' ? 'selected' : ''}>mixed</option>
+        </select></label>`;
+    },
+    root: () => rand(48, 64),
+    build(item, root, o, q) {
+      const top = root + item.data;
+      const dir = q.dir;
+      if (dir === 'together') return [{ n: [root, top], t: 0, d: 1.8 }];
+      if (dir === 'down') return [{ n: [top], t: 0, d: 1 }, { n: [root], t: 0.8, d: 1.3 }];
+      return [{ n: [root], t: 0, d: 1 }, { n: [top], t: 0.8, d: 1.3 }];
+    },
+    prepare(q, o) {
+      q.dir = o.dir === 'mixed' ? ['up', 'down', 'together'][rand(0, 2)] : o.dir;
+    },
+    hint: item => `${item.data} semitones. Going up, it sounds like: ${item.ex}.`
+  },
+
+  chords: {
+    title: 'Chords',
+    desc: 'A chord is played. Name its type.',
+    items: [
+      ['Major', [0, 4, 7], 'Bright and stable.', true],
+      ['Minor', [0, 3, 7], 'Darker, often sounds sad.', true],
+      ['Diminished', [0, 3, 6], 'Tense and unstable.', false],
+      ['Augmented', [0, 4, 8], 'Dreamy and unresolved.', false],
+      ['Dominant 7th', [0, 4, 7, 10], 'Bluesy, wants to move somewhere.', false],
+      ['Major 7th', [0, 4, 7, 11], 'Soft and jazzy.', false],
+      ['Minor 7th', [0, 3, 7, 10], 'Mellow and smooth.', false]
+    ].map(([label, data, hint, on], i) => ({ id: 'c' + i, label, data, hint, on })),
+    options: { arp: true },
+    renderOptions(o) {
+      return `<label><input type="checkbox" data-opt="arp" ${o.arp ? 'checked' : ''}> Play the notes one by one first</label>`;
+    },
+    root: () => rand(48, 62),
+    build(item, root, o) {
+      const notes = item.data.map(x => root + x);
+      const ev = [];
+      let t = 0;
+      if (o.arp) {
+        notes.forEach((n, i) => ev.push({ n: [n], t: i * 0.38, d: 0.7 }));
+        t = notes.length * 0.38 + 0.25;
+      }
+      ev.push({ n: notes, t, d: 2 });
+      return ev;
+    },
+    hint: item => item.hint
+  },
+
+  scales: {
+    title: 'Scales & modes',
+    desc: 'A scale is played from its lowest note. Name the scale.',
+    items: [
+      ['Major', [0, 2, 4, 5, 7, 9, 11, 12], 'The familiar do-re-mi. Bright.', true],
+      ['Natural minor', [0, 2, 3, 5, 7, 8, 10, 12], 'Darker and sadder than major.', true],
+      ['Harmonic minor', [0, 2, 3, 5, 7, 8, 11, 12], 'Minor with an exotic leap near the top.', false],
+      ['Melodic minor', [0, 2, 3, 5, 7, 9, 11, 12], 'Starts minor, ends like major.', false],
+      ['Major pentatonic', [0, 2, 4, 7, 9, 12], 'Five notes, open and folk-like.', false],
+      ['Minor pentatonic', [0, 3, 5, 7, 10, 12], 'Five notes, the sound of rock riffs.', false],
+      ['Blues', [0, 3, 5, 6, 7, 10, 12], 'Minor pentatonic plus a gritty extra note.', false],
+      ['Dorian', [0, 2, 3, 5, 7, 9, 10, 12], 'Minor, but with a brighter 6th note.', false],
+      ['Phrygian', [0, 1, 3, 5, 7, 8, 10, 12], 'Minor with a dark, close 2nd note.', false],
+      ['Lydian', [0, 2, 4, 6, 7, 9, 11, 12], 'Major with a floating raised 4th.', false],
+      ['Mixolydian', [0, 2, 4, 5, 7, 9, 10, 12], 'Major with a lowered 7th. Bluesy-rock.', false],
+      ['Locrian', [0, 1, 3, 5, 6, 8, 10, 12], 'Very unstable, rarely used.', false]
+    ].map(([label, data, hint, on], i) => ({ id: 's' + i, label, data, hint, on })),
+    options: { updown: false },
+    renderOptions(o) {
+      return `<label><input type="checkbox" data-opt="updown" ${o.updown ? 'checked' : ''}> Play up and back down</label>`;
+    },
+    root: () => rand(52, 62),
+    build(item, root, o) {
+      let seq = item.data.map(x => root + x);
+      if (o.updown) seq = seq.concat(seq.slice(0, -1).reverse());
+      return seq.map((n, i) => ({ n: [n], t: i * 0.32, d: i === seq.length - 1 ? 1 : 0.5 }));
+    },
+    hint: item => item.hint
+  }
+};
+
+/* ---------- Audio ---------- */
+let ac, master, bus;
+function audio() {
+  if (!ac) {
+    // iOS: without this, Safari mutes Web Audio when the ring/silent switch is on
+    if (navigator.audioSession) { try { navigator.audioSession.type = 'playback'; } catch (e) {} }
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    const comp = ac.createDynamicsCompressor();
+    comp.connect(ac.destination);
+    master = ac.createGain();
+    master.gain.value = 0.55;
+    master.connect(comp);
+  }
+  if (ac.state !== 'running') ac.resume();
+  return ac;
+}
+function newBus() {
+  audio();
+  if (bus) {
+    const old = bus;
+    old.gain.setTargetAtTime(0, ac.currentTime, 0.02);
+    setTimeout(() => old.disconnect(), 400);
+  }
+  bus = ac.createGain();
+  bus.connect(master);
+  return bus;
+}
+function tone(out, midi, t, dur) {
+  const f = 440 * Math.pow(2, (midi - 69) / 12);
+  const env = ac.createGain();
+  env.connect(out);
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.linearRampToValueAtTime(0.22, t + 0.01);
+  env.gain.exponentialRampToValueAtTime(0.07, t + 0.35);
+  env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  [[1, 1], [2, 0.45], [3, 0.18], [4, 0.08], [5, 0.04]].forEach(([h, a]) => {
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = f * h;
+    const g = ac.createGain();
+    g.gain.value = a;
+    o.connect(g).connect(env);
+    o.start(t);
+    o.stop(t + dur + 0.05);
+  });
+}
+function playEvents(events) {
+  const out = newBus();
+  const start = ac.currentTime + 0.05;
+  events.forEach(e => e.n.forEach(m => tone(out, m, start + e.t, e.d)));
+}
+
+/* ---------- State ---------- */
+const state = {
+  ex: 'pitch',
+  q: null,          // { item, root, ... }
+  answered: false,
+  stats: {},        // stats[ex][itemId] = { right, total }
+  session: {}       // session[ex] = { right, total, streak, best }
+};
+Object.keys(EXERCISES).forEach(k => {
+  state.stats[k] = {};
+  state.session[k] = { right: 0, total: 0, streak: 0, best: 0 };
+});
+
+const $ = s => document.querySelector(s);
+const ex = () => EXERCISES[state.ex];
+const enabled = () => ex().activeItems ? ex().activeItems() : ex().items.filter(i => i.on);
+
+/* Pick a question, favoring items you've been getting wrong */
+function pickItem() {
+  const items = enabled();
+  const st = state.stats[state.ex];
+  const last = state.q && state.q.item;
+  const weights = items.map(it => {
+    const s = st[it.id];
+    let w = s && s.total ? 1 + 3 * (s.total - s.right) / s.total : 1.5;
+    if (items.length > 1 && it === last) w *= 0.25;
+    return w;
+  });
+  let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < items.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return items[i];
+  }
+  return items[items.length - 1];
+}
+
+/* ---------- Actions ---------- */
+function newQuestion() {
+  const e = ex();
+  const q = { item: pickItem(), root: e.root() };
+  if (e.prepare) e.prepare(q, e.options);
+  state.q = q;
+  state.answered = false;
+  setHighlight([]);
+  setFeedback('', 'Listen, then pick your answer.');
+  $('#compareNote').textContent = '';
+  renderAnswers();
+  playQuestion();
+  updateButtons();
+}
+function eventsFor(item) {
+  return ex().build(item, state.q.root, ex().options, state.q);
+}
+function playQuestion() {
+  const ev = eventsFor(state.q.item);
+  playEvents(ev);
+  if (state.answered) setHighlight(ev.flatMap(e => e.n));
+}
+function answer(item) {
+  if (!state.q) return;
+  if (state.answered) {               // after answering: compare by listening
+    const ev = eventsFor(item);
+    playEvents(ev);
+    setHighlight(ev.flatMap(e => e.n));
+    return;
+  }
+  const correct = state.q.item;
+  const ok = item === correct;
+  state.answered = true;
+
+  const st = state.stats[state.ex];
+  st[correct.id] = st[correct.id] || { right: 0, total: 0, label: correct.label };
+  st[correct.id].total++;
+  if (ok) st[correct.id].right++;
+  const s = state.session[state.ex];
+  s.total++;
+  if (ok) { s.right++; s.streak++; s.best = Math.max(s.best, s.streak); } else s.streak = 0;
+
+  const hint = ex().hint(correct);
+  if (ok) setFeedback('good', `Correct: ${correct.label}.`, hint);
+  else setFeedback('bad', `It was ${correct.label}. You picked ${item.label}.`, hint);
+
+  setHighlight(eventsFor(correct).flatMap(e => e.n));
+  $('#compareNote').textContent = 'Tap any answer to hear it from the same starting note and compare.';
+  renderAnswers(item);
+  renderStats();
+  updateButtons();
+}
+function mainAction() {
+  if (!state.q || state.answered) newQuestion();
+  else playQuestion();
+}
+
+/* ---------- Rendering ---------- */
+function setFeedback(kind, text, hint) {
+  const f = $('#feedback');
+  f.className = 'feedback' + (kind ? ' ' + kind : '');
+  f.innerHTML = '';
+  f.append(text);
+  if (hint) {
+    const h = document.createElement('span');
+    h.className = 'hint';
+    h.textContent = hint;
+    f.append(h);
+  }
+}
+function updateButtons() {
+  $('#mainBtn').textContent = !state.q ? 'Start' : state.answered ? 'Next question' : 'Replay';
+  $('#replayBtn').hidden = !(state.q && state.answered);
+}
+function renderTabs() {
+  const t = $('#tabs');
+  t.innerHTML = '';
+  Object.entries(EXERCISES).forEach(([key, e]) => {
+    const b = document.createElement('button');
+    b.className = 'tab';
+    b.role = 'tab';
+    b.textContent = e.title;
+    b.setAttribute('aria-selected', key === state.ex);
+    b.onclick = () => switchExercise(key);
+    t.append(b);
+  });
+}
+function renderAnswers(picked) {
+  const box = $('#answers');
+  box.innerHTML = '';
+  box.classList.toggle('compact', state.ex === 'pitch');
+  enabled().forEach((item, i) => {
+    const b = document.createElement('button');
+    b.className = 'answer';
+    if (state.answered) {
+      if (item === state.q.item) b.classList.add('correct');
+      else if (item === picked) b.classList.add('wrong');
+    }
+    b.disabled = !state.q;
+    b.innerHTML = (i < 9 ? `<span class="num">${i + 1}</span>` : '') + item.label;
+    b.onclick = () => answer(item);
+    box.append(b);
+  });
+}
+function renderSettings() {
+  const e = ex();
+  const box = $('#items');
+  box.innerHTML = '';
+  e.items.forEach(item => {
+    const l = document.createElement('label');
+    const c = document.createElement('input');
+    c.type = 'checkbox';
+    c.checked = item.on;
+    c.onchange = () => {
+      item.on = c.checked;
+      if (enabled().length < 2) {
+        item.on = c.checked = true;
+        $('#warn').textContent = 'Keep at least two choices so there is something to compare.';
+        return;
+      }
+      $('#warn').textContent = '';
+      resetQuestion();
+    };
+    l.append(c, ' ' + item.label);
+    box.append(l);
+  });
+  const opts = $('#opts');
+  opts.innerHTML = e.renderOptions(e.options);
+  opts.querySelectorAll('[data-opt]').forEach(el => {
+    el.onchange = () => {
+      e.options[el.dataset.opt] = el.type === 'checkbox' ? el.checked : el.value;
+      resetQuestion();
+    };
+  });
+  $('#warn').textContent = '';
+}
+function renderStats() {
+  const s = state.session[state.ex];
+  const st = state.stats[state.ex];
+  const box = $('#stats');
+  if (!s.total) {
+    box.innerHTML = '<p>Your score for this exercise will show here.</p>';
+    return;
+  }
+  const pct = Math.round(100 * s.right / s.total);
+  const weak = Object.values(st)
+    .filter(x => x.total >= 3 && x.right / x.total < 0.7)
+    .map(x => `${x.label} (${x.right} of ${x.total})`);
+  box.innerHTML = `
+    <p><strong>${s.right} of ${s.total} correct</strong> (${pct}%). Current streak ${s.streak}, best ${s.best}.</p>
+    ${weak.length ? `<p>Needs practice: ${weak.join(', ')}. These will come up more often.</p>` : ''}
+    <p><button class="linkbtn" id="resetStats">Reset score</button></p>`;
+  $('#resetStats').onclick = () => {
+    state.stats[state.ex] = {};
+    state.session[state.ex] = { right: 0, total: 0, streak: 0, best: 0 };
+    renderStats();
+  };
+}
+function resetQuestion() {
+  state.q = null;
+  state.answered = false;
+  setHighlight([]);
+  setFeedback('', 'Settings changed. Press Start for a new question.');
+  $('#compareNote').textContent = '';
+  renderAnswers();
+  updateButtons();
+}
+function switchExercise(key) {
+  state.ex = key;
+  $('#desc').textContent = ex().desc;
+  renderTabs();
+  renderSettings();
+  renderStats();
+  state.q = null;
+  state.answered = false;
+  setHighlight([]);
+  setFeedback('', 'Press Start to hear your first question.');
+  $('#compareNote').textContent = '';
+  renderAnswers();
+  updateButtons();
+}
+
+/* ---------- Keyboard ---------- */
+const KB_LO = 48, KB_HI = 84;
+const isBlack = m => [1, 3, 6, 8, 10].includes(m % 12);
+function buildKeyboard() {
+  const kb = $('#kb');
+  const whiteCount = [...Array(KB_HI - KB_LO + 1)].filter((_, i) => !isBlack(KB_LO + i)).length;
+  const w = 100 / whiteCount;
+  let wi = 0;
+  for (let m = KB_LO; m <= KB_HI; m++) {
+    const k = document.createElement('div');
+    k.dataset.m = m;
+    if (isBlack(m)) {
+      k.className = 'key black';
+      k.style.left = (wi * w - w * 0.3) + '%';
+      k.style.width = (w * 0.6) + '%';
+    } else {
+      k.className = 'key white';
+      k.style.left = (wi * w) + '%';
+      k.style.width = w + '%';
+      if (m % 12 === 0) k.innerHTML = `<span>C${m / 12 - 1}</span>`;
+      wi++;
+    }
+    k.onpointerdown = () => playEvents([{ n: [m], t: 0, d: 1.2 }]);
+    kb.append(k);
+  }
+}
+function setHighlight(notes) {
+  document.querySelectorAll('.key').forEach(k => {
+    k.classList.toggle('hl', notes.includes(+k.dataset.m));
+  });
+}
+
+/* ---------- Wiring ---------- */
+$('#mainBtn').onclick = mainAction;
+$('#replayBtn').onclick = playQuestion;
+document.addEventListener('keydown', e => {
+  if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+  if (e.code === 'Space' || e.key === 'Enter') {
+    e.preventDefault();
+    mainAction();
+  } else if (/^[1-9]$/.test(e.key) && state.q) {
+    const item = enabled()[+e.key - 1];
+    if (item) answer(item);
+  }
+});
+
+buildKeyboard();
+switchExercise('pitch');
+
+/* ---------- Version and updates ---------- */
+$('#version').textContent = 'Version ' + (self.APP_VERSION || 'unknown');
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    // Check for a new version whenever the app comes back to the foreground
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update();
+    });
+  });
+  // A new version has taken over: offer a reload so the page shows it
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController) $('#updateBtn').hidden = false;
+  });
+  $('#updateBtn').onclick = () => location.reload();
+}
+</script>
+</body>
+</html>

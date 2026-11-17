@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flower heads</title>
+<meta name="robots" content="noindex">
+<script src="garden.js"></script>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#000000; --text:#e6e6e6; --muted:#8c8c8c; --line:#3a3a3a;
+  --inv-bg:#e6e6e6; --inv-text:#000000;
+  --mono:"SF Mono", ui-monospace, Menlo, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 var(--mono);text-shadow:0 0 6px rgba(230,230,230,.28)}
+.wrap{max-width:1000px;margin:0 auto;
+  padding:max(24px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 60px max(18px, env(safe-area-inset-left))}
+h1{font-size:1.35rem;margin:0 0 4px;letter-spacing:.06em}
+p{margin:0 0 18px;color:var(--muted)}
+a{color:var(--text)}
+canvas{display:block;width:100%;height:auto;background:#000;
+  image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;image-rendering:pixelated}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
+.card{border:1px solid var(--line);padding:10px}
+.card h2{font-size:1rem;margin:0 0 8px;display:flex;justify-content:space-between;gap:8px}
+.card h2 span{color:var(--muted);font-weight:400}
+.views{display:grid;grid-template-columns:2fr 1fr;gap:8px;align-items:start}
+.views canvas{border:1px solid var(--line)}
+.row{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:.8rem;color:var(--muted)}
+button{font:inherit;color:inherit;background:none;border:2px solid var(--text);border-radius:0;padding:4px 10px;cursor:pointer;touch-action:manipulation}
+button:hover{background:var(--inv-bg);color:var(--inv-text);text-shadow:none}
+:focus-visible{outline:2px dashed var(--text);outline-offset:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Flower heads</h1>
+  <p>The heads for the big flower, each in full bloom. Each new garden picks one of the heads marked "in the random pick". The small picture on the right is the head enlarged.
+    Press "Watch it grow" to see all its steps. <a href="garden-test.html">Garden test</a></p>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+const grid = document.getElementById('grid');
+Garden.heads.forEach(({ key, name }, i) => {
+  const card = document.createElement('section');
+  card.className = 'card';
+  card.innerHTML = `<h2>${i + 1}. ${name}${Garden.randomHeads.includes(key) ? ' <span>in the random pick</span>' : ' <span>not used</span>'}</h2>
+    <div class="views"><canvas class="scene"></canvas><canvas class="zoom" width="20" height="14"></canvas></div>
+    <div class="row"><button>Watch it grow</button><span class="step"></span></div>`;
+  grid.append(card);
+
+  const scene = card.querySelector('.scene'), zoom = card.querySelector('.zoom').getContext('2d');
+  const stepEl = card.querySelector('.step');
+  const live = Garden.create(scene, n => {
+    stepEl.textContent = n >= Garden.FULL_BLOOM ? 'Full bloom' : `Step ${n}: ${Garden.label(n, key)}`;
+  }, { head: key });
+  live.set(Garden.FULL_BLOOM);
+
+  // copy the head area into the enlarged view
+  (function copy() {
+    zoom.drawImage(scene, Garden.W / 2 - 10, 0, 20, 14, 0, 0, 20, 14);
+    requestAnimationFrame(copy);
+  })();
+
+  let timer = null;
+  card.querySelector('button').onclick = () => {
+    clearInterval(timer);
+    live.set(0);
+    timer = setInterval(() => {
+      if (live.count >= Garden.FULL_BLOOM) return clearInterval(timer);
+      live.grow();
+    }, 450);
+  };
+});
+</script>
+</body>
+</html>
